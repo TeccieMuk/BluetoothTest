@@ -20,7 +20,6 @@ let ledControlRequest = null
 let ledControlResponse = null
 let cloudConnectionCharacteristic = null
 let cloudConnectionRequest = null
-let networkSettingsMessage = null
 let cloudConnectionResponse = null
 
 controlButton.addEventListener("click", handleConnectButton);
@@ -51,12 +50,11 @@ async function handleConnectButton() {
         console.log("Loading protobuf..")
         const root = await protobuf.load("./assets/proto/bluetooth.proto");
     
-        // Obtain a message type
+        // Obtain message types
         ledControlRequest = root.lookupType("LedControlRequest");
         ledControlResponse = root.lookupType("LedControlResponse");
         cloudConnectionRequest = root.lookupType("CloudConnectionRequest");
         cloudConnectionResponse = root.lookupType("CloudConnectionResponse");
-        networkSettingsMessage = null;
         connectionStatus.textContent = "CONNECTED";
     }
     catch (err){

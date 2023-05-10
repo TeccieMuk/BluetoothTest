@@ -4,20 +4,32 @@ const connectionStatus = document.getElementById("connectionStatus");
 const rgb1Button = document.getElementById("dropdownRGB1Button");
 const rgb2Button = document.getElementById("dropdownRGB2Button");
 const rgb3Button = document.getElementById("dropdownRGB3Button");
+const lastResponseLabel = document.getElementById("lastResponseLabel");
+const wifiSsidInput = document.getElementById("wifiSsidInput");
+const wifiPasswordInput = document.getElementById("wifiPasswordInput");
+const accountIdInput = document.getElementById("accountIdInput");
+const sendWifiSetupButton = document.getElementById("sendWifiSetupButton");
 
 // Note that the byte order of the uuid's is reversed with respect to the device.
 const serviceUuid = "04001301-4202-1600-ea11-11beec7a1806"
-const characteristicUuid = "668bf93a-2372-aa8e-8448-c99ea6c04093"
+const ledCharacteristicUuid = "668bf93a-2372-aa8e-8448-c99ea6c04093"
+const wifiCharacteristicUuid = "TBD"
 let connectedDevice = null
-let characteristic = null
+let ledCharacteristic = null
 let ledControlRequest = null
+let ledControlResponse = null
+let cloudConnectionCharacteristic = null
+let cloudConnectionRequest = null
+let networkSettingsMessage = null
+let cloudConnectionResponse = null
 
-controlButton.addEventListener("click", BLEManager);
+controlButton.addEventListener("click", handleConnectButton);
+sendWifiSetupButton.addEventListener("click", handleSendWifiSetupButton);
 rgb1Button.addEventListener("click", Rgb1Send)
 rgb2Button.addEventListener("click", Rgb2Send)
 rgb3Button.addEventListener("click", Rgb3Send)
 
-async function BLEManager() {
+async function handleConnectButton() {
     connectionStatus.textContent = "SEARCHING";
     try {
 
@@ -28,67 +40,80 @@ async function BLEManager() {
             optionalServices: [serviceUuid]
         });
 
-
+        connectionStatus.textContent = "CONNECTING";
         connectedDevice = await device.gatt.connect()
         console.log("Device Connected")
         const service = await connectedDevice.getPrimaryService(serviceUuid);
         console.log("Services obtained")
-        characteristic = await service.getCharacteristic(characteristicUuid);
+        ledCharacteristic = await service.getCharacteristic(ledCharacteristicUuid);
         console.log("Characteristic obtained")
-
+        ledCharacteristic.addEventListener('characteristicValueChanged', handleLedCharacteristicResponse)
         console.log("Loading protobuf..")
-        protobuf.load("./assets/proto/bluetooth.proto", function(err, root) {
-          if (err)
-              throw err;
-      
-          // Obtain a message type
-          ledControlRequest = root.lookupType("LedControlRequest");
-          // // Decode an Uint8Array (browser) or Buffer (node) to a message
-          // var message = AwesomeMessage.decode(buffer);
-          // // ... do something with message
-      
-          // // If the application uses length-delimited buffers, there is also encodeDelimited and decodeDelimited.
-      
-          // // Maybe convert the message back to a plain object
-          // var object = AwesomeMessage.toObject(message, {
-          //     longs: String,
-          //     enums: String,
-          //     bytes: String,
-          //     // see ConversionOptions
-          // });
-      });
-
-        connectionStatus.textContent = "Connected";
-
-
+        const root = await protobuf.load("./assets/proto/bluetooth.proto");
+    
+        // Obtain a message type
+        ledControlRequest = root.lookupType("LedControlRequest");
+        ledControlResponse = root.lookupType("LedControlResponse");
+        cloudConnectionRequest = root.lookupType("CloudConnectionRequest");
+        cloudConnectionResponse = root.lookupType("CloudConnectionResponse");
+        networkSettingsMessage = null;
+        connectionStatus.textContent = "CONNECTED";
     }
     catch (err){
         connectionStatus.textContent = err
      }
-  }
+}
 
 async function Rgb1Send(){
-  sendRgb(1)
+  var payload = { 
+    mode: 2,
+    color: 1
+  };
+  sendProtobufOverBluetooth(ledControlRequest, payload, ledCharacteristic)
 }
 
 async function Rgb2Send(){
-  sendRgb(2)
+  var payload = { 
+    mode: 2,
+    color: 2
+  };
+  sendProtobufOverBluetooth(ledControlRequest, payload, ledCharacteristic)
 }
 
 async function Rgb3Send(){
-  sendRgb(3)
+  var payload = { 
+    mode: 2,
+    color: 3
+  };
+  sendProtobufOverBluetooth(ledControlRequest, payload, ledCharacteristic)
 }
 
-async function sendRgb(value){
-  if (connectedDevice === null)
+async function handleSendWifiSetupButton() {
+  // TODO: THIS LIBRARY MESSES UP THE CASING!
+  // One would expect the properties to be "bootstrap_network", but this results in an empty object.
+  // It is possible to set a 'keep-case' flag in the load function, but I got some errors when attempting this.
+  var payload = { 
+    bootstrapNetwork: {
+      ssid: wifiSsidInput.value,
+      password: wifiPasswordInput.value
+    },
+    accountId: accountIdInput.value
+  };
+  // TODO: Use correct characteristic.
+  sendProtobufOverBluetooth(cloudConnectionRequest, payload, ledCharacteristic)
+}
+
+async function sendProtobufOverBluetooth(request, payload, characteristic){
+  if (characteristic === null)
   {
-    console.log("Connect first.")
+    // TODO better check if device is still connected.
+    console.log("Characteristic unknown, connect first.")
   }
   else
   {
     try
     {
-      const buffer = await createProtobufBuffer(value)
+      const buffer = await createProtobufBuffer(request, payload)
       characteristic.writeValue(buffer)
       console.log("Message sent!")
     }
@@ -98,27 +123,41 @@ async function sendRgb(value){
   }
 }
 
-async function createProtobufBuffer(value){
-  var payload = { 
-    mode: 2,
-    color: value
-  };
-    
+async function createProtobufBuffer(request, payload){
   // Verify the payload if necessary (i.e. when possibly incomplete or invalid)
-  var errMsg = ledControlRequest.verify(payload);
+  var errMsg = request.verify(payload);
   if (errMsg)
       throw Error(errMsg);
   
   // Create a new message
-  var message = ledControlRequest.create(payload); // or use .fromObject if conversion is necessary
-  
+  var message = request.create(payload); // or use .fromObject if conversion is necessary
+  console.log('Message:')
+  console.log(message)
   // Encode a message to an Uint8Array (browser) or Buffer (node)
-  const buffer = ledControlRequest.encode(message).finish();
+  const buffer = request.encode(message).finish();
+  console.log('Buffer:')
+  console.log(buffer)
   // Log te b64 encoded string for debugging purposes.
-  var decoder = new TextDecoder('utf8');
-  var b64encoded = btoa(decoder.decode(buffer));
-  console.log(b64encoded)
+  console.log('Encoded:')
+  console.log(toBase64(buffer))
   // The bufer is sliced since it will create an array with a reserved length of ~8000 characters,
   // bluetooth will complain about this.
   return buffer.buffer.slice(0, buffer.byteLength)
 }
+
+function handleLedCharacteristicResponse(event) {
+  const buffer = event.target.value;
+  console.log(buffer)
+  // Decode an Uint8Array (browser) or Buffer (node) to a message
+  var message = ledControlResponse.decode(buffer);
+  console.log(message)
+  lastResponseLabel.textContent = toBase64(buffer);
+}
+
+function toBase64(buffer)
+{
+  var decoder = new TextDecoder('utf8');
+  var b64encoded = btoa(decoder.decode(buffer));
+  return b64encoded
+}
+

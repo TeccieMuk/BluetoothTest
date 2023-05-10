@@ -47,7 +47,7 @@
 
   <main>
     <div class="row">
-      <div class="col-10">
+      <div class="col-5">
         <input class="form-control" id="deviceNameInput" placeholder="Enter device name">
       </div>
       <div class="col-2">
@@ -64,6 +64,39 @@
       </div>
     </div>
 
+    <hr>
+
+    <div class="row">
+      <div class="col-3 gy-4">
+        <h5>WiFi Setup</h5>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-3">
+        <input class="form-control" id="wifiSsidInput" placeholder="Enter Ssid">
+      </div>
+      <div class="col-3">
+        <input class="form-control" id="wifiPasswordInput" type="password" placeholder="Enter Password">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-3 gy-2">
+        <input class="form-control" id="accountIdInput" placeholder="Enter Account ID">
+      </div>
+      <div class="col-2 gy-2">
+        <button type="button" id="sendWifiSetupButton" class="btn btn-primary">Configure</button>
+      </div>
+    </div>
+
+    <hr>
+
+    <div class="row">
+      <div class="col-3 gy-4">
+        <h5>Commands</h5>
+      </div>
+    </div>
+
     <div class="row">
       <div class="dropdown">
         <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownRGBButton" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -76,8 +109,14 @@
         </div>
       </div>
     </div>
-
-
+    <div class="row">
+      <div class="col-3 gy-4">
+        <h5>Last Response:</h5>
+      </div>
+    </div>
+    <div class="row">
+      <h6 id="lastResponseLabel"></h6>
+    </div>
   </main>
 </div>
 

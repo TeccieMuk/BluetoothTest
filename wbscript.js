@@ -113,6 +113,8 @@ async function sendProtobufOverBluetooth(request, payload, characteristic){
     {
       const buffer = await createProtobufBuffer(request, payload)
       characteristic.writeValue(buffer)
+      console.log('Buffer through bluetooth:')
+      console.log(buffer)
       console.log("Message sent!")
     }
     catch (err){
@@ -140,7 +142,7 @@ async function createProtobufBuffer(request, payload){
   console.log(toBase64(buffer))
   // The bufer is sliced since it will create an array with a reserved length of ~8000 characters,
   // bluetooth will complain about this.
-  return buffer.buffer.slice(0, buffer.byteLength)
+  return buffer.slice(0, buffer.byteLength)
 }
 
 function handleLedCharacteristicResponse(event) {

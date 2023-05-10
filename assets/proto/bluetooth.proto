@@ -1,0 +1,173 @@
+syntax =  "proto3";
+
+message NetworkSettings {
+    string ssid = 1;
+    string password = 2;
+}
+
+message Timestamp {
+	// 64 bit value for Unix time
+	int64 unix_time = 1;
+	
+	// 32 bit value for milliseconds between each measurement
+	int32 milliseconds = 2;
+}
+
+message Temperature {
+    // Integer value: 16.3 degrees => 16
+    // Note: As values are in range 0..127, it only requires one byte
+    int64 temperature_degrees = 1;
+
+    // Fractional value in two decimals: 16.3 degrees => 30
+    // Note: As values are in range 0..127, it only requires one byte
+    int64 temperature_centi_degrees = 2;
+}
+
+message Flow {
+    int32 flow_liters = 1;
+    int32 flow_centi_liters = 2;
+}
+
+message BatteryLevel {
+    int32 level_volts = 1;
+    int32 level_centi_volts = 2;
+}
+
+message TapEventDataPoint {
+    Timestamp time_stamp = 1;
+
+    Temperature temperature = 2;
+    Flow flow = 3;
+
+    // May not always be present
+    BatteryLevel battery = 4;
+}
+
+message LedControlRequest {
+    enum Mode {
+        OFF = 0;
+        BLINK = 1;
+        ON = 2;
+    }
+
+    enum Color {
+        UNSET = 0;
+        BLUE = 1;
+        RED = 2;
+        GREEN = 3;
+        ORANGE = 4;
+        WHITE = 5;
+        // more?
+    }
+
+    Mode mode = 1;
+    Color color = 2;
+
+    // When non zero, the LED switches off after the specified period ended,
+    // which can continue after end of tap event (or until overridden by a new
+    // request). Otherwise, the LED remains in requested state until overridden
+    // by a new request, or the tap event ended.
+    int32 duration_seconds = 3;
+}
+
+message LedControlResponse {
+}
+
+message CloudConnectionRequest {
+
+    // The settings to connect to the cloud. Once connected, the cloud is
+    // responsible for configuring the network and may change the initial
+    // settings.
+    NetworkSettings bootstrap_network = 1;
+
+    string account_id = 2;
+}
+
+message CloudConnectionResponse {
+
+    enum Result {
+        RESULT_UNKNOWN = 0;
+        ERROR_ALREADY_CONNECTED = 1;
+
+        // It cannot connect to the cloud while it is connected to bluetooth.
+        // It therefore only tries to connect after the bluetooth connection is
+        // dropped.
+        REQUEST_ACCEPTED = 2;
+    }
+
+    Result result = 1;
+}
+
+message FactoryResetRequest {
+
+    // Requests without a valid secret are ignored. The sensor obtains the
+    // secret when it first connects to the cloud and is linked to an account.
+    string secret = 1;
+}
+
+message FactoryResetResponse {
+
+    enum Result {
+        RESULT_UNKNOWN = 0;
+        ERROR_AUTHENTICATION_FAILED = 1;
+        WARNING_ALREADY_RESET = 2;
+        REQUEST_ACCEPTED = 3;
+    }
+
+    Result result = 1;
+}
+
+message StatusRequest {
+}
+
+message StatusResponse {
+    enum Status {
+        UNKNOWN = 0;
+
+        // Initial status
+        FACTORY_SETTINGS = 1;
+
+        // Received request to connect to cloud, but did not yet manage to
+        // connect.
+        ESTABLISHING_LINK = 2;
+
+        // Request to cloud failed
+        ERROR_ESTABLISHING_LINK = 3;
+
+        // Successfully linked to cloud
+        ESTABLISHED_LINK = 4;
+    }
+
+    // Resets after a successful connection
+    int32 num_failed_network_attempts = 1;
+
+    // Resets after a failed connection
+    int32 num_successful_uploads = 2;
+
+    // The number of ambient temperature measurements that are not yet uploaded
+    int32 num_queued_ambient_datapoints = 3;
+
+    // The number of tap events datapoints that are not yet uploaded
+    int32 num_queued_tap_event_datapoints = 4;
+}
+
+message TapDataPointRequest {
+    Timestamp from = 1;
+}
+
+message TapDataPointResponse {
+    repeated TapEventDataPoint data_points = 1;
+}
+
+//TODO: Check if this grpc spec will be used when communicating over bluetooth.
+service sensor_bluetooth_service {
+    rpc ConnectToCloud(CloudConnectionRequest) returns (CloudConnectionResponse);
+
+    rpc FactoryReset(FactoryResetRequest) returns (FactoryResetResponse);
+
+    rpc Status(StatusRequest) returns (StatusResponse);
+
+    rpc LedControl(LedControlRequest) returns (LedControlResponse);
+
+    rpc GetTapDataPoints(TapDataPointRequest) returns (TapDataPointResponse);
+}

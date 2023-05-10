@@ -4,8 +4,13 @@ const connectionStatus = document.getElementById("connectionStatus");
 const rgb1Button = document.getElementById("dropdownRGB1Button");
 const rgb2Button = document.getElementById("dropdownRGB2Button");
 const rgb3Button = document.getElementById("dropdownRGB3Button");
+
+// Note that the byte order of the uuid's is reversed with respect to the device.
+const serviceUuid = "04001301-4202-1600-ea11-11beec7a1806"
+const characteristicUuid = "668bf93a-2372-aa8e-8448-c99ea6c04093"
 let connectedDevice = null
 let characteristic = null
+let ledControlRequest = null
 
 controlButton.addEventListener("click", BLEManager);
 rgb1Button.addEventListener("click", Rgb1Send)
@@ -20,18 +25,42 @@ async function BLEManager() {
             filters: [{
               namePrefix: deviceNameInput.value
             }],
-            optionalServices: ["04001301-4202-1600-ea11-11beec7a1806"]
+            optionalServices: [serviceUuid]
         });
 
-        //0x93, 0x40, 0xc0, 0xa6, 0x9e, 0xc9, 0x48, 0x84, 0x8e, 0xaa, 0x72, 0x23, 0x3a, 0xf9, 0x8b, 0x66
-        //668bf93a-2372-aa8e-8448-c99ea6c04093
+
         connectedDevice = await device.gatt.connect()
         console.log("Device Connected")
-        const service = await connectedDevice.getPrimaryService("04001301-4202-1600-ea11-11beec7a1806");
+        const service = await connectedDevice.getPrimaryService(serviceUuid);
         console.log("Services obtained")
-        characteristic = await service.getCharacteristic("668bf93a-2372-aa8e-8448-c99ea6c04093");
+        characteristic = await service.getCharacteristic(characteristicUuid);
         console.log("Characteristic obtained")
+
+        console.log("Loading protobuf..")
+        protobuf.load("./assets/proto/bluetooth.proto", function(err, root) {
+          if (err)
+              throw err;
+      
+          // Obtain a message type
+          ledControlRequest = root.lookupType("LedControlRequest");
+          // // Decode an Uint8Array (browser) or Buffer (node) to a message
+          // var message = AwesomeMessage.decode(buffer);
+          // // ... do something with message
+      
+          // // If the application uses length-delimited buffers, there is also encodeDelimited and decodeDelimited.
+      
+          // // Maybe convert the message back to a plain object
+          // var object = AwesomeMessage.toObject(message, {
+          //     longs: String,
+          //     enums: String,
+          //     bytes: String,
+          //     // see ConversionOptions
+          // });
+      });
+
         connectionStatus.textContent = "Connected";
+
+
     }
     catch (err){
         connectionStatus.textContent = err
@@ -57,8 +86,39 @@ async function sendRgb(value){
   }
   else
   {
-    const thingToSend = Uint8Array.of(value);
-    characteristic.writeValue(thingToSend)
-    console.log("Thing sent!")
+    try
+    {
+      const buffer = await createProtobufBuffer(value)
+      characteristic.writeValue(buffer)
+      console.log("Message sent!")
+    }
+    catch (err){
+      connectionStatus.textContent = err
+   }
   }
+}
+
+async function createProtobufBuffer(value){
+  var payload = { 
+    mode: 2,
+    color: value
+  };
+    
+  // Verify the payload if necessary (i.e. when possibly incomplete or invalid)
+  var errMsg = ledControlRequest.verify(payload);
+  if (errMsg)
+      throw Error(errMsg);
+  
+  // Create a new message
+  var message = ledControlRequest.create(payload); // or use .fromObject if conversion is necessary
+  
+  // Encode a message to an Uint8Array (browser) or Buffer (node)
+  const buffer = ledControlRequest.encode(message).finish();
+  // Log te b64 encoded string for debugging purposes.
+  var decoder = new TextDecoder('utf8');
+  var b64encoded = btoa(decoder.decode(buffer));
+  console.log(b64encoded)
+  // The bufer is sliced since it will create an array with a reserved length of ~8000 characters,
+  // bluetooth will complain about this.
+  return buffer.buffer.slice(0, buffer.byteLength)
 }

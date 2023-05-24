@@ -9,11 +9,17 @@ const wifiSsidInput = document.getElementById("wifiSsidInput");
 const wifiPasswordInput = document.getElementById("wifiPasswordInput");
 const accountIdInput = document.getElementById("accountIdInput");
 const sendWifiSetupButton = document.getElementById("sendWifiSetupButton");
+const streamButton = document.getElementById("streamButton");
+const factoryResetButton = document.getElementById("factoryResetButton")
+const secretInput = document.getElementById("secretInput");
 
 // Note that the byte order of the uuid's is reversed with respect to the device.
 const serviceUuid = "04001301-4202-1600-ea11-11beec7a1806"
 const ledCharacteristicUuid = "668bf93a-2372-aa8e-8448-c99ea6c04093"
 const wifiCharacteristicUuid = "TBD"
+const streamCharacteristicUuid = "TBD2"
+const factoryResetCharacteristicUuid = "TBD3"
+const statusCharacteristicUuid = "TBD4"
 let connectedDevice = null
 let ledCharacteristic = null
 let ledControlRequest = null
@@ -21,12 +27,28 @@ let ledControlResponse = null
 let cloudConnectionCharacteristic = null
 let cloudConnectionRequest = null
 let cloudConnectionResponse = null
+let tapDataPointRequest = null
+let tapDataPointResponse = null
+let streamCharacteristic = null
+let factoryResetRequest = null
+let factoryResponseRequest = null
+let factoryResetCharacteristic = null
+let statusRequest = null
+let statusResponse = null
+let statusCharacteristic = null
+let last_stream_date = null
+let isStreaming = false
+let streamTimerId = null
+let statusTimerId = null
+let lastStreamTimestamp = null
 
 controlButton.addEventListener("click", handleConnectButton);
 sendWifiSetupButton.addEventListener("click", handleSendWifiSetupButton);
 rgb1Button.addEventListener("click", Rgb1Send)
 rgb2Button.addEventListener("click", Rgb2Send)
 rgb3Button.addEventListener("click", Rgb3Send)
+streamButton.addEventListener("click", handleStreamButton)
+factoryResetButton.addEventListener("click", handleFactoryResetButton)
 
 async function handleConnectButton() {
     connectionStatus.textContent = "SEARCHING";
@@ -45,8 +67,14 @@ async function handleConnectButton() {
         const service = await connectedDevice.getPrimaryService(serviceUuid);
         console.log("Services obtained")
         ledCharacteristic = await service.getCharacteristic(ledCharacteristicUuid);
+        streamCharacteristic = await service.getCharacteristic(streamCharacteristicUuid)
+        factoryResetCharacteristic = await service.getCharacteristic(factoryResetCharacteristicUuid)
+        statusCharacteristic = await service.getCharacteristic(statusCharacteristicUuid)
         console.log("Characteristic obtained")
         ledCharacteristic.addEventListener('characteristicValueChanged', handleLedCharacteristicResponse)
+        streamCharacteristic.addEventListener('characteristicValueChanged', handleStreamCharacteristicResponse)
+        factoryResetCharacteristic.addEventListener('characteristicValueChanged', handleFactoryResetCharacteristicResponse)
+        statusCharacteristic.addEventListener('characteristicValueChanged', handleStatusResponse)
         console.log("Loading protobuf..")
         const root = await protobuf.load("./assets/proto/bluetooth.proto");
     
@@ -55,7 +83,14 @@ async function handleConnectButton() {
         ledControlResponse = root.lookupType("LedControlResponse");
         cloudConnectionRequest = root.lookupType("CloudConnectionRequest");
         cloudConnectionResponse = root.lookupType("CloudConnectionResponse");
+        tapDataPointRequest = root.lookupType("TapDataPointRequest")
+        tapDataPointResponse = root.lookupType("TapDataPointResponse")
+        factoryResetRequest = root.lookupType("FactoryResetRequest")
+        factoryResetResponse = root.lookupType("factoryResetResponse")
+        statusRequest = root.lookupType("StatusRequest")
+        statusResponse = root.lookupType("StatusResponse")
         connectionStatus.textContent = "CONNECTED";
+        statusTimerId = window.setInterval(updateStatus, 1000)
     }
     catch (err){
         connectionStatus.textContent = err
@@ -97,8 +132,48 @@ async function handleSendWifiSetupButton() {
     },
     accountId: accountIdInput.value
   };
-  // TODO: Use correct characteristic.
   sendProtobufOverBluetooth(cloudConnectionRequest, payload, ledCharacteristic)
+}
+
+async function handleStreamButton() {
+  if (isStreaming){
+    streamButton.textContent="Start Streaming"
+    window.clearTimeout(streamTimerId)
+  }
+  else
+  {
+    streamButton.textContent="Stop Streaming"
+    streamTimerId = window.setInterval(stream, 1000)
+  }
+  isStreaming = !isStreaming
+}
+
+async function handleFactoryResetButton() {
+  var payload = {
+    secret: secretInput.value
+  }
+  sendProtobufOverBluetooth(factoryResetRequest, payload, factoryResetCharacteristic)
+}
+
+async function stream() {
+  if (lastStreamTimestamp == null)
+  {
+    lastStreamTimestamp = Date.now() - 1
+  }
+
+  const payload = {
+    from: {
+      unix_time: Math.floor(lastStreamTimestamp),
+      milliseconds: Number((lastStreamTimestamp % 1).toFixed(3).substring(2))
+    }
+  }
+  sendProtobufOverBluetooth(tapDataPointRequest, payload, streamCharacteristic)
+  lastStreamTimestamp = Date.now()
+}
+
+async function updateStatus() {
+  const payload = {}
+  sendProtobufOverBluetooth(statusRequest, payload, statusCharacteristic)
 }
 
 async function sendProtobufOverBluetooth(request, payload, characteristic){
@@ -146,12 +221,34 @@ async function createProtobufBuffer(request, payload){
 }
 
 function handleLedCharacteristicResponse(event) {
+  handleGenericResponse(event, ledControlResponse)
+}
+
+function handleStreamCharacteristicResponse(event) {
+  handleGenericResponse(event, tapDataPointResponse)
+}
+
+function handleFactoryResetCharacteristicResponse(event) {
+  handleGenericResponse(event, factoryResetResponse)
+}
+
+function handleGenericResponse(event, response) {
   const buffer = event.target.value;
   console.log(buffer)
   // Decode an Uint8Array (browser) or Buffer (node) to a message
-  var message = ledControlResponse.decode(buffer);
+  var message = response.decode(buffer);
   console.log(message)
   lastResponseLabel.textContent = toBase64(buffer);
+}
+
+function handleStatusResponse(event) {
+  const buffer = event.target.value;
+  console.log(buffer)
+  // Decode an Uint8Array (browser) or Buffer (node) to a message
+  var message = statusResponse.decode(buffer);
+  statusResponse = message.toJSON()
+  sensorStatus.textContent = statusResponse
+  console.log(message)
 }
 
 function toBase64(buffer)

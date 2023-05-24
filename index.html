@@ -64,6 +64,15 @@
       </div>
     </div>
 
+    <div class="row">
+      <div class="col-3 gy-4">
+        <h5>Sensor Status</h5>
+      </div>
+      <div class="col-9 gy-4">
+        <h5 id="sensorStatus">Not Connected</h5>
+      </div>
+    </div>
+
     <hr>
 
     <div class="row">
@@ -109,6 +118,22 @@
         </div>
       </div>
     </div>
+
+    <div class="row">
+      <div class="col-3 gy-4">
+        <button type="button" id="streamButton" class="btn btn-primary">Start Streaming</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-3 gy-4">
+        <button type="button" id="factoryResetButton" class="btn btn-primary">Factory Reset</button>
+      </div>
+      <div class="col-3 gy-4">
+        <input class="form-control" id="secretInput" placeholder="Enter Reset Secret">
+      </div>
+    </div>
+
     <div class="row">
       <div class="col-3 gy-4">
         <h5>Last Response:</h5>

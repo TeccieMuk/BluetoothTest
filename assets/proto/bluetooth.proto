@@ -138,17 +138,19 @@ message StatusResponse {
         ESTABLISHED_LINK = 4;
     }
 
+    Status status = 1;
+
     // Resets after a successful connection
-    int32 num_failed_network_attempts = 1;
+    int32 num_failed_network_attempts = 2;
 
     // Resets after a failed connection
-    int32 num_successful_uploads = 2;
+    int32 num_successful_uploads = 3;
 
     // The number of ambient temperature measurements that are not yet uploaded
-    int32 num_queued_ambient_datapoints = 3;
+    int32 num_queued_ambient_datapoints = 4;
 
     // The number of tap events datapoints that are not yet uploaded
-    int32 num_queued_tap_event_datapoints = 4;
+    int32 num_queued_tap_event_datapoints = 5;
 }
 
 message TapDataPointRequest {

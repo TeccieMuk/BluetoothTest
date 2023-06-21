@@ -5,12 +5,22 @@ message NetworkSettings {
     string password = 2;
 }
 
+message CloudSettings {
+    string endpoint_url = 1;
+    string mqtt_topic_name = 2;
+}
+
 message Timestamp {
 	// 64 bit value for Unix time
 	int64 unix_time = 1;
 	
 	// 32 bit value for milliseconds between each measurement
 	int32 milliseconds = 2;
+}
+
+message NetworkScanResult {
+    string ssid = 1;
+    int32 rssi = 2;
 }
 
 message Temperature {
@@ -23,23 +33,20 @@ message Temperature {
     int64 temperature_centi_degrees = 2;
 }
 
-message Flow {
-    int32 flow_liters = 1;
-    int32 flow_centi_liters = 2;
+message FlowRate {
+    int32 liters_per_minute = 1;
+    int32 centi_liters_per_minute = 2;
 }
 
 message BatteryLevel {
-    int32 level_volts = 1;
-    int32 level_centi_volts = 2;
+    int32 level_in_percent = 1;
 }
 
 message TapEventDataPoint {
     Timestamp time_stamp = 1;
 
     Temperature temperature = 2;
-    Flow flow = 3;
-
-    // May not always be present
+    FlowRate flow_rate = 3;
     BatteryLevel battery = 4;
 }
 
@@ -73,45 +80,59 @@ message LedControlRequest {
 message LedControlResponse {
 }
 
-message CloudConnectionRequest {
+// Sets the bootstrap network. This will be used to connect to the cloud.
+//
+// When the sensor is already linked to the cloud (LINKED_TO_CLOUD) it
+// will use these settings only for its next upload. Othwerwise it uses
+// them until it established a successful connection and the cloud
+// returned network settings in response.
+message SetBootstrapNetworkRequest {
 
-    // The settings to connect to the cloud. Once connected, the cloud is
-    // responsible for configuring the network and may change the initial
-    // settings.
+    // The settings for the network used to connect to the cloud. Once
+    // connected, the cloud is responsible for configuring the network
+    // and may change the network that is used.
     NetworkSettings bootstrap_network = 1;
 
-    string account_id = 2;
+    // The settings for the cloud back-end to connect to.
+    //
+    // Once the cloud settings are configured, they cannot be changed. They
+    // should remain empty in subsequent requests.
+    CloudSettings cloud_settings = 2;
 }
 
-message CloudConnectionResponse {
+message SetBootstrapNetworkResponse {
 
     enum Result {
         RESULT_UNKNOWN = 0;
-        ERROR_ALREADY_CONNECTED = 1;
-
-        // It cannot connect to the cloud while it is connected to bluetooth.
-        // It therefore only tries to connect after the bluetooth connection is
-        // dropped.
-        REQUEST_ACCEPTED = 2;
+        OK = 1;
+        ERROR_UNKNOWN = 2;
+        ERROR_ALREADY_LINKED_TO_CLOUD = 3;
     }
 
     Result result = 1;
 }
 
+// Request to reset all configuration, pending measurements, device
+// state, and secret. After this, a sensor can be re-configured to
+// connect to a different customer account, or to a different AWS cloud
+// environment.
+//
+// Note, this reset does not impact the following: the installed firmware,
+// the time, or the device-specific certificate used for MQTT communication.
 message FactoryResetRequest {
 
-    // Requests without a valid secret are ignored. The sensor obtains the
-    // secret when it first connects to the cloud and is linked to an account.
-    string secret = 1;
+    // When sensor has status LINKED_TO_ACCOUNT it only accepts the request
+    // to change it when the request includes a valid secret.
+    optional string secret = 1;
 }
 
 message FactoryResetResponse {
 
     enum Result {
         RESULT_UNKNOWN = 0;
-        ERROR_AUTHENTICATION_FAILED = 1;
-        WARNING_ALREADY_RESET = 2;
-        REQUEST_ACCEPTED = 3;
+        OK = 1;
+        ERROR_AUTHENTICATION_FAILED = 2;
+        ERROR_UNKNOWN = 3;
     }
 
     Result result = 1;
@@ -122,23 +143,29 @@ message StatusRequest {
 
 message StatusResponse {
     enum Status {
-        UNKNOWN = 0;
+        FACTORY_SETTINGS = 0;
 
-        // Initial status
-        FACTORY_SETTINGS = 1;
+        // Network configured, but did not successfully connect yet
+        // (no secret configured)
+        NETWORK_CONFIGURED = 1;
 
-        // Received request to connect to cloud, but did not yet manage to
-        // connect.
-        ESTABLISHING_LINK = 2;
+        // Successfully connected to cloud, and received a response
+        // including secret required to reset sensor settings.
+        LINKED_TO_ACCOUNT = 2;
+    }
 
-        // Request to cloud failed
-        ERROR_ESTABLISHING_LINK = 3;
-
-        // Successfully linked to cloud
-        ESTABLISHED_LINK = 4;
+    enum UploadResult {
+        RESULT_UNKNOWN = 0;
+        RESULT_SUCCESS = 1;
+        RESULT_WIFI_NOT_FOUND = 2;
+        RESULT_WIFI_AUTHENTICATION_FAILED = 3;
+        RESULT_INVALID_ENDPOINT = 4;
+        RESULT_INVALID_CERTIFICATE = 5;
+        RESULT_NO_RESPONSE = 6;
     }
 
     Status status = 1;
+    UploadResult last_upload_result = 6;
 
     // Resets after a successful connection
     int32 num_failed_network_attempts = 2;
@@ -161,15 +188,33 @@ message TapDataPointResponse {
     repeated TapEventDataPoint data_points = 1;
 }
 
-//TODO: Check if this grpc spec will be used when communicating over bluetooth.
-service sensor_bluetooth_service {
-    rpc ConnectToCloud(CloudConnectionRequest) returns (CloudConnectionResponse);
+message ScanWifiNetworksRequest {
+    // When duration is zero, it does not scan.
+    int32 scan_duration_in_seconds = 1;
+}
 
+message ScanWifiNetworksResponse {
+    repeated NetworkScanResult wifi_networks = 1;
+    Timestamp scan_timestamp = 2;
+}
+
+// Service UUID: 78f48b46-d15b-4af6-9adb-603c623da97a
+service sensor_bluetooth_service {
+    // Characteristic UUID: e89246ce-e4ca-4754-b06c-9e3a9f002779
+    rpc SetBootstrapNetwork(SetBootstrapNetworkRequest) returns (SetBootstrapNetworkResponse);
+
+    // Characteristic UUID: fb7bd8e0-2c8d-4440-9db6-c29ef94f3816
     rpc FactoryReset(FactoryResetRequest) returns (FactoryResetResponse);
 
+    // Characteristic UUID: abeb3d94-6a98-4298-9602-1be23091726e
     rpc Status(StatusRequest) returns (StatusResponse);
 
+    // Characteristic UUID: d2f7d855-12e1-4f0e-8bef-e94057a0d966
     rpc LedControl(LedControlRequest) returns (LedControlResponse);
 
+    // Characteristic UUID: 61dd971f-d8c7-4beb-8939-464ab31053a0
     rpc GetTapDataPoints(TapDataPointRequest) returns (TapDataPointResponse);
+
+    // Characteristic UUID: 1f3c4c9c-179c-4f42-bbc0-7d22b86e33ec
+    rpc ScanWifiNetworks(ScanWifiNetworksRequest) returns (ScanWifiNetworksResponse);
 }

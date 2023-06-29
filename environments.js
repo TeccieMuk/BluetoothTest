@@ -11,7 +11,7 @@ const environments = [
         "name": "Staging",
         "postfix": "staging",
         "base_url": "https://ty7p9ko8hd.execute-api.eu-west-1.amazonaws.com/staging",
-        "auth_header": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJ0amVjY28uY29tIiwiYXVkIjoic2Vuc29yaW5nIiwiaWF0IjoxNjg4MDI4MzY5LCJleHAiOjE2ODgwMjkyNjksImp0aSI6MTc0LCJraWQiOjI3LCJhaWQiOjExLCJzY29wZSI6W3sicmlkIjoiU1NZUk9PVCIsIm9yZyI6NX1dfQ.rTAsSlRKYc6GKRiXDRbHJJh__rf-OVmjxnYGReocetMxkwOmdkgtWP96VYy5FJ6mwd-34v9Lnu4IMS9YKQ0GKLByQ-pyWR0UPH1XmaNDSblkx_6fcoLU5ddn5T_nwA_9TMl2xXqxy04bVHM5tDZTWzV6lQ4SLx_OXIjGTXv5ESSJvz_8V2J25onVkMDw-1LMMUV-F0CZc47fySEqvOvFMgPUZP9v4UGKZOmLfgcWYmdcIy9L0xuJRl_wOuXHz9uOtYyLfo0UPzHiU30Fk-0YhdAsDwNxljdU60EM2Z8cYHBEDtVSwdrAnnr5WssPDrg8hgYrRiwRM_kn3PPBw7Zryg"
+        "auth_header": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJ0amVjY28uY29tIiwiYXVkIjoic2Vuc29yaW5nIiwiaWF0IjoxNjg4MDI5OTg2LCJleHAiOjE2ODgwMzA4ODYsImp0aSI6MTc3LCJraWQiOjI3LCJhaWQiOjExLCJzY29wZSI6W3sicmlkIjoiU1NZUk9PVCIsIm9yZyI6NX1dfQ.cxGwChdzTnqnkCx-YHzx98SmNiEyx-XGCQIb5qZiPH2YOks9bGZVynWmKh2unpFlcJiCcANTiBJAeJwUkaidZzRPdUGjGqD_u-EijWe2SnO1SDsoa65ChRnDdWKdQH2h-pPpWjza6mhXoafelvdVktDAVarruP4rY93QHCMrtZvtfhf_Am-t4cTv19UsJ_MPJpt94hGIl_P86JyUOBQFobLSrbgMHEzheULMb1F_CqB6Pt9UcL9oS7b1lVpL4soqavtkJwC32fAagH3oFlZrnMsv3NkkzIXAE7EWWj8HiNJTsGbOf2bjcsmZQ_Lwg_XdbACreAN0Zvsidka5etaBMQ"
     }
 ]
 

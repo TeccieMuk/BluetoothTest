@@ -10,6 +10,7 @@
 
 import { searchAndConnectToDevice, sendRgbValue, getStatus, factoryReset, getTapEventDatapoints } from './bluetooth_service.js'
 import { getDeviceSecret } from './api_service.js'
+import { initializeEnvironments } from "./environments.js"
 
 const connectButton = document.getElementById("connectButton");
 const connectionStatus = document.getElementById("connectionStatus");
@@ -20,6 +21,9 @@ const dataPointsButton = document.getElementById("dataPointsButton");
 const factoryResetButton = document.getElementById("factoryResetButton")
 const statusResponseTextArea = document.getElementById("statusTextArea");
 const tapEventDataResponseSelect = document.getElementById("tapEventDataResponseSelect")
+const environmentsDropdownContainer = document.getElementById("environmentsDropdownContainer")
+const dropdownEnvironmentButton = document.getElementById("dropdownEnvironmentButton")
+const dropdownRGBButton = document.getElementById("dropdownRGBButton")
 
 connectButton.addEventListener("click", handleConnectButton);
 rgb1Button.addEventListener("click", Rgb1Send)
@@ -30,11 +34,11 @@ factoryResetButton.addEventListener("click", handleFactoryResetButton)
 
 const maxDataPoints = 20
 let isStreaming = false
-let streamTimerId = null
-let statusTimerId = null
+let timer_id = null
 let currentDataPointIndex = 0
 let serialNumber = null
-let lastStreamTimestamp = null
+
+initializeEnvironments(environmentsDropdownContainer, dropdownEnvironmentButton)
 
 async function handleConnectButton() {
     connectionStatus.textContent = "SEARCHING";
@@ -43,7 +47,7 @@ async function handleConnectButton() {
         const device = await searchAndConnectToDevice(deviceNameInput.value)
         serialNumber = device.name.replace('tjecco_', '')
         connectionStatus.textContent = "CONNECTED";
-        statusTimerId = window.setInterval(updateStatus, 5000)
+        timer_id = window.setInterval(timerTick, 5000)
     }
     catch (err) {
         connectionStatus.textContent = err
@@ -64,12 +68,16 @@ async function Rgb3Send() {
 
 async function handleDataPointsButton() {
     if (isStreaming) {
-        dataPointsButton.textContent = "Start Collecting Datapoints"
-        window.clearTimeout(streamTimerId)
+        dataPointsButton.textContent = "Start Collecting Datapoints and Status"
+        window.clearTimeout(timer_id)
+        factoryResetButton.disabled = false
+        dropdownRGBButton.disabled = false
     }
     else {
-        dataPointsButton.textContent = "Stop Collecting Datapoints"
-        streamTimerId = window.setInterval(stream, 5000)
+        dataPointsButton.textContent = "Stop Collecting Datapoints and Status"
+        timer_id = window.setTimeout(timerTick, 5000)
+        factoryResetButton.disabled = true
+        dropdownRGBButton.disabled = true
     }
     isStreaming = !isStreaming
 }
@@ -77,33 +85,27 @@ async function handleDataPointsButton() {
 async function handleFactoryResetButton() {
     const secret = await getDeviceSecret(serialNumber)
     const response = await factoryReset(secret)
-    alert(`Received secret response: ${response}`)
+    alert(`Received secret response: ${JSON.stringify(response)}`)
 }
 
-async function stream() {
-    if (lastStreamTimestamp == null) {
-        lastStreamTimestamp = Date.now() - 5
-    }
-
-    const dataPoints = await getTapEventDatapoints(lastStreamTimestamp)
-    lastStreamTimestamp = Date.now()
-
-    for (let datapoint in dataPoints.data_points)
+async function updateDatapoints() {
+    const dataPointsResponse = await getTapEventDatapoints()
+    for (let i = dataPointsResponse.dataPoints.length -1; i >= 0; --i)
     {
+        const datapoint = dataPointsResponse.dataPoints[i]
         if (currentDataPointIndex == maxDataPoints)
         {
             currentDataPointIndex = 0
         }
-
-        const timestamp = new Date(datapoint.time_stamp.unix_time * 1000)
+        const timestamp = new Date(datapoint.timeStamp.unixTime * 1000)
         const hour = timestamp.getHours()
         const minute = timestamp.getMinutes()
         const seconds = timestamp.getSeconds()
-        const degrees =  datapoint.temperature.temperature_centi_degrees
-        const centi_degrees = datapoint.temperature.temperature_degrees
-        const flow_l = datapoint.flow_rate.liters_per_minute
-        const flow_cl = datapoint.flow_rate.centi_liters_per_minute
-        const battery = datapoint.battery.level_in_percent
+        const degrees =  datapoint.temperature.temperatureDegrees
+        const centi_degrees = datapoint.temperature.temperatureCentiDegrees
+        const flow_l = datapoint.flowRate.litersPerMinute
+        const flow_cl = datapoint.flowRate.centiLitersPerMinute
+        const battery = datapoint.battery.levelInPercent
 
         const header = `${hour}:${minute}:${seconds} - T:${degrees}.${centi_degrees} F:${flow_l}.${flow_cl} B:${battery}`
         tapEventDataResponseSelect.options[currentDataPointIndex] = new Option(header)
@@ -112,7 +114,25 @@ async function stream() {
     }
 }
 
+async function timerTick(){
+    if (isStreaming == false)
+    {
+        console.log("Not streaming, skip.")
+        return
+    }
+
+    console.log("Streaming!")
+    await updateStatus()
+    await updateDatapoints()
+
+    if (isStreaming == false)
+    {
+        factoryResetButton.disabled = false
+        dropdownRGBButton.disabled = false
+    }
+}
+
 async function updateStatus() {
     const statusResponse = await getStatus()
-    statusResponseTextArea.value = statusResponse
+    statusResponseTextArea.value = JSON.stringify(statusResponse)
 }

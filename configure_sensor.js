@@ -11,6 +11,7 @@
 import { connectTapSensorToAccount, getNetworks, getNetwork, connectSensorToNetwork, createNetwork } from "./api_service.js"
 import { sendRgbValue, searchAndConnectToDevice, performNetworkScan, getNetworksAfterScan, bootstrapNetwork,
          reconnectBluetooth } from "./bluetooth_service.js";
+import { initializeEnvironments } from "./environments.js"
 
 const connectButton = document.getElementById("connectButton");
 const deviceNameInput = document.getElementById("deviceNameInput");
@@ -30,6 +31,8 @@ const wifiNetworksListBox = document.getElementById("wifiNetworksListBox")
 const wifiPasswordInput = document.getElementById("wifiPasswordInput")
 const networkGroupName = document.getElementById("networkGroupName")
 const createNetworkGroupButton = document.getElementById("createNetworkGroupButton")
+const environmentsDropdownContainer = document.getElementById("environmentsDropdownContainer")
+const dropdownEnvironmentButton = document.getElementById("dropdownEnvironmentButton")
 
 serialNumberInput.disabled = true
 accountIdInput.disabled = true
@@ -45,6 +48,8 @@ connectNetworkGroupButton.addEventListener("click", handleConnectNetworkGroupBut
 scanNetworksButton.addEventListener("click", handleScanNetworksButton)
 getNetworksButton.addEventListener("click", handleGetNetworksButton)
 createNetworkGroupButton.addEventListener("click", handleCreateNetworkGroupButton)
+
+initializeEnvironments(environmentsDropdownContainer, dropdownEnvironmentButton)
 
 async function handleConnectButton() {
   try {
@@ -121,7 +126,7 @@ async function handleConnectNetworkGroupButton() {
 
   const bootstrapResult = await bootstrapNetwork(network.mainSsid, network.mainPassword)
   console.log(bootstrapResult)
-  if (bootstrapResult.result == 'OK') {
+  if (bootstrapResult.result == 1) {
     alert('Sensor configured. Close the tap and inspect if tap an empty bootstrap event is received in the cloud to confirm configuration.')
   }
   else {
@@ -174,7 +179,7 @@ async function handleCreateNetworkGroupButton() {
 
   const bootstrapResult = await bootstrapNetwork(ssid, password)
   console.log(bootstrapResult)
-  if (bootstrapResult.result == 'OK') {
+  if (bootstrapResult.result == 1) {
     alert('Sensor configured. Close the tap and inspect if tap an empty bootstrap event is received in the cloud to confirm configuration.')
   }
   else {

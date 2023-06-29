@@ -2,11 +2,18 @@
     Contains all cloud api requests.
 */
 
-const base_url = 'https://22ajohpbrd.execute-api.eu-west-1.amazonaws.com/dev'
-const auth_header = 'Bearer eyJhbGciOiJSUzI1NiJ9.eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImlzcyI6InRqZWNjby5jb20iLCJhdWQiOiJzZW5zb3JpbmciLCJpYXQiOjE2ODM1NDkyNzEsImV4cCI6MTcxNTQxOTgzMiwianRpIjozNzMsImtpZCI6NjIsImFpZCI6Mywic2NvcGUiOlt7InJpZCI6IlNTT0NPTUEiLCJvcmciOiJUZXN0QWNjb3VudCJ9XX0.RgDztCPTOFFcO3yzcwapchx5oSNQx9opb6AmkHFJ7Z2y2VOCXco5iGC3aJRg6-zYAHuoczsWo7-7DdtS_r3svBdFvtPEkGbSg6J6hjCQWE2ktndjhaxjVO2aG5rb6WH5u1m-jMuocq7d26ZLJpWreuYW2EhZjFDhyQvhnmyqYoK2eQP0CLlKIlEwlHdQWym8CSiJ2NpHu8Qgj1umvbtED_Kw9vgrxDcrU9vMeMU5DMha7DF2M_LLD8LyQKNK-2OmWr07yxWv-JmskVRkYo2zN0QfHvEZpA2LbAHeb73GyTcMT4-nK5MuW-rBS69Mmgr7AtzMWpb0xsgmH8JBEnc21A'
-const headers = { 
-    'Content-Type': 'application/json',
-    'Authorization': auth_header
+let base_url = ''
+let auth_header = ''
+let headers = ''
+
+export function setEnvironment(environment) {
+    console.log(`Setting environment URL to ${environment.base_url}`)
+    base_url = environment.base_url
+    auth_header = environment.auth_header
+    headers = { 
+        'Content-Type': 'application/json',
+        'Authorization': auth_header
+    }
 }
 
 export async function connectTapSensorToAccount(serial_number, accountId) {
@@ -70,9 +77,9 @@ export async function getDevice(serial_number) {
 }
 
 export async function getDeviceSecret(serial_number) {
-    device = await getDevice(serial_number)
+    const device = await getDevice(serial_number)
     
-    const url = `${base_url}/secrets/${device.tapsensorId}`
+    const url = `${base_url}/sensors/${device.tapsensor_id}/status`
 
     const response = await fetch(
         url, { 
@@ -80,8 +87,8 @@ export async function getDeviceSecret(serial_number) {
         headers: headers}
     );
 
-    result = await handleBodyResponse(response)
-    return result.secret
+    const result = await handleBodyResponse(response)
+    return Number(result.secret)
 }
 
 export async function createNetwork(name, ssid, password)

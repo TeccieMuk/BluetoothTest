@@ -98,17 +98,11 @@ export async function sendRgbValue(color, mode) {
         color: color
     };
 
-    sendProtobufOverBluetooth(ledControlRequest, payload, ledCharacteristic)
+    await sendProtobufOverBluetooth(ledControlRequest, payload, ledCharacteristic)
 }
 
-export async function getTapEventDatapoints(from_timestamp){
-    const payload = {
-        from: {
-            unix_time: Math.floor(from_timestamp),
-            milliseconds: Number((from_timestamp % 1).toFixed(3).substring(2))
-        }
-    }
-    return await sendProtobufOverBluetoothAndReceiveResponse(tapDataPointRequest, tapDataPointResponse, payload, tapDataPointCharacteristic)
+export async function getTapEventDatapoints(){
+    return await readProtobufResponse(tapDataPointResponse, tapDataPointCharacteristic)
 }
 
 export async function getStatus(){
@@ -155,24 +149,26 @@ async function initialize_device(device) {
     previouslyConnectedDevice = device
 }
 
-async function sendProtobufOverBluetooth(request, payload, characteristic) {
+async function sendProtobufOverBluetoothAndReceiveResponse(request, response, payload, characteristic) {
+    await sendProtobufOverBluetooth(request, payload, characteristic)
+    return await readProtobufResponse(response, characteristic)
+}
+
+async function readProtobufResponse(response, characteristic) {
     if (characteristic === null) {
         // TODO better check if device is still connected.
         console.log("Characteristic unknown, connect first.")
+        return null
     }
-    else {
-        const buffer = await createProtobufBuffer(request, payload)
-        console.log('Sending...')
-        await characteristic.writeValueWithResponse(buffer)
-        console.log("Message sent!")
-        //console.log('Buffer through bluetooth:')
-        //console.log(buffer)
-        const result = await characteristic.readValue()
-        console.log(`ReadValue result: ${buf2hex(result.buffer)}`)
-    }
+
+    const result = await characteristic.readValue()
+    console.log(`ReadValue result: ${buf2hex(result.buffer)}`)
+    //console.log('Buffer through bluetooth:')
+    //console.log(buffer)
+    return response.decode(new Uint8Array(result.buffer))
 }
 
-async function sendProtobufOverBluetoothAndReceiveResponse(request, response, payload, characteristic) {
+async function sendProtobufOverBluetooth(request, payload, characteristic) {
     if (characteristic === null) {
         // TODO better check if device is still connected.
         console.log("Characteristic unknown, connect first.")
@@ -183,11 +179,6 @@ async function sendProtobufOverBluetoothAndReceiveResponse(request, response, pa
         console.log('Sending...')
         await characteristic.writeValueWithResponse(buffer)
         console.log("Message sent!")
-        //console.log('Buffer through bluetooth:')
-        //console.log(buffer)
-        const result = await characteristic.readValue()
-        console.log(`ReadValue result: ${buf2hex(result.buffer)}`)
-        return response.decode(new Uint8Array(result.buffer)).toJSON()
     }
 }
 
